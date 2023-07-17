@@ -3,7 +3,7 @@ import openai
 
 def transcribe():
     model = whisper.load_model("base")
-    result = model.transcribe("Alina_Chn.wav")
+    result = model.transcribe("audio (1).wav")
     transcript = result["text"]
     print(transcript)
     return transcript

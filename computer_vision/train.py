@@ -3,6 +3,7 @@ from fastdownload import download_url
 from fastai.vision.all import *
 from time import sleep
 
+# Script for training CV model 
 searches = 'ok hand sign real', 'peace hand sign real'
 path = Path('ok_or_peace')
 

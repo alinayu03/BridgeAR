@@ -4,7 +4,7 @@ from fastdownload import download_url
 from fastai.vision.all import *
 from time import sleep
 
-
+# Script for scraping training images from web
 def search_images(term, max_images=100):
     print(f"Searching for '{term}'")
     return L(ddg_images(term, max_results=max_images)).itemgot('image')
