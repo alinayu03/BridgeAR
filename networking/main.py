@@ -19,6 +19,8 @@ DATA_RX_CHAR_UUID = "e5700002-7bac-429a-b4ce-57ff900f479d"
 DATA_TX_CHAR_UUID = "e5700003-7bac-429a-b4ce-57ff900f479d"
 
 #WAV_HEADER = (b"\x52\x49\x46\x46\x18\x4d\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
+
+# 16 bit header
 # WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
 #              # b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
 #              b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00"
@@ -26,6 +28,8 @@ DATA_TX_CHAR_UUID = "e5700003-7bac-429a-b4ce-57ff900f479d"
 # WAV_HEADER = (
 #    b"\x52\x49\x46\x46\x70\xcb\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00\x02\x00\x10\x00\x64\x61\x74\x61\x4c\xcb\x00\x00")
               #b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
+
+# 8 bit header 
 WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
               b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
               b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
@@ -61,7 +65,7 @@ def translate(transcript: str):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a translator. Translate these sentences into English."},
+            {"role": "system", "content": "You are a translator. Translate this into English."},
             {"role": "user", "content": transcript}
         ]
     )
@@ -97,6 +101,7 @@ class MonocleAudioServer:
         sys.stdout.flush()
 
     def handle_data_tx(self, _: BleakGATTCharacteristic, data: bytearray):
+        # important: convert signed 8 bit audio to unsigned 8 bit
         self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
 
     async def send_cmd(self, cmd: str, channel: BleakGATTCharacteristic, delay: float = 1.0):
