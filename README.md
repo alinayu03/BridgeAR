@@ -9,7 +9,7 @@ Open source AR/AI project designed to bridge communication between hearing and h
 ## Features
 ### Hearing
 - Speech to text
-- Passive, realtime transcription
+- Passive, realtime transcription allowing subtitles for real life. 
 ### Speaking
 - Sign to speech
 - Using computer vision to translate custom set of hand gestures to useful phrases, such as introductions and common questions. 
