@@ -97,7 +97,7 @@ class MonocleAudioServer:
         sys.stdout.flush()
 
     def handle_data_tx(self, _: BleakGATTCharacteristic, data: bytearray):
-        self.audio_buffer.extend(data)
+        self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
 
     async def send_cmd(self, cmd: str, channel: BleakGATTCharacteristic, delay: float = 1.0):
         # Write cmd ending with \x04 (ctrl-d) as bytestring. ctrl-d is used
