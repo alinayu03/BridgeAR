@@ -19,14 +19,17 @@ DATA_RX_CHAR_UUID = "e5700002-7bac-429a-b4ce-57ff900f479d"
 DATA_TX_CHAR_UUID = "e5700003-7bac-429a-b4ce-57ff900f479d"
 
 #WAV_HEADER = (b"\x52\x49\x46\x46\x18\x4d\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
-#WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
+# WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
 #              # b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
 #              b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00"
 #              b"\x02\x00\x10\x00\x64\x61\x74\x61\x00\x00\x00\x00")
 # WAV_HEADER = (
 #    b"\x52\x49\x46\x46\x70\xcb\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00\x02\x00\x10\x00\x64\x61\x74\x61\x4c\xcb\x00\x00")
               #b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
-WAV_HEADER = b""
+WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
+              b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
+              b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
+# WAV_HEADER = b""
 AUDIO_OUTPUT_PATH = "/tmp/audio.wav"
 
 
@@ -136,7 +139,7 @@ class MonocleAudioServer:
         # hackathon, but this can be extended to using the touch buttons on the
         # device or to continually record and stream the audio bytes to the
         # server.
-        await self.send_cmd("print('start recording')\nmicrophone.record(seconds=5.0, sample_rate=8000, bit_depth=16)", repl_rx_char, 5)
+        await self.send_cmd("print('start recording')\nmicrophone.record(seconds=5.0, sample_rate=8000, bit_depth=8)", repl_rx_char, 5)
         await self.send_cmd("print('stop recording')", repl_rx_char)
         # This code to send the audio bytes over the data channel is extremely
         # hacky. There are probably issues with the FPGA buffer being overflown
@@ -162,8 +165,8 @@ while True:
 
     def process_audio(self):
         # Rewrite data length in the wav header with the correct length.
-        #self.audio_buffer[4:8] = (len(self.audio_buffer) - 8).to_bytes(4)
-        #self.audio_buffer[40:44] = (len(self.audio_buffer) - 44).to_bytes(4)
+        self.audio_buffer[4:8] = (len(self.audio_buffer) - 8).to_bytes(4)
+        self.audio_buffer[40:44] = (len(self.audio_buffer) - 44).to_bytes(4)
         with open(AUDIO_OUTPUT_PATH, "wb") as f:
             f.write(self.audio_buffer)
         transcript = transcribe(AUDIO_OUTPUT_PATH)
