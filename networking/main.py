@@ -18,22 +18,10 @@ DATA_SERVICE_UUID = "e5700001-7bac-429a-b4ce-57ff900f479d"
 DATA_RX_CHAR_UUID = "e5700002-7bac-429a-b4ce-57ff900f479d"
 DATA_TX_CHAR_UUID = "e5700003-7bac-429a-b4ce-57ff900f479d"
 
-#WAV_HEADER = (b"\x52\x49\x46\x46\x18\x4d\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
-
-# 16 bit header
-# WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
-#              # b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
-#              b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00"
-#              b"\x02\x00\x10\x00\x64\x61\x74\x61\x00\x00\x00\x00")
-# WAV_HEADER = (
-#    b"\x52\x49\x46\x46\x70\xcb\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x80\x3e\x00\x00\x02\x00\x10\x00\x64\x61\x74\x61\x4c\xcb\x00\x00")
-              #b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
-
-# 8 bit header 
+# 8 bit wav header
 WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
               b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
               b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
-# WAV_HEADER = b""
 AUDIO_OUTPUT_PATH = "/tmp/audio.wav"
 
 
@@ -65,7 +53,8 @@ def translate(transcript: str):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a translator. Translate this into English."},
+            {"role": "system",
+                "content": "You are a translator. Translate this into English."},
             {"role": "user", "content": transcript}
         ]
     )
@@ -101,7 +90,11 @@ class MonocleAudioServer:
         sys.stdout.flush()
 
     def handle_data_tx(self, _: BleakGATTCharacteristic, data: bytearray):
-        # important: convert signed 8 bit audio to unsigned 8 bit
+        # Monocle emits 8-bit PCM audio bytes in signed format, but the WAV
+        # standard expects 8-bit or smaller sized samples to be unsigned. Since
+        # we manually prepend the WAV header and expect the output to be a WAV
+        # file, we manually convert the signed bytes to unsigned by shifting
+        # all bytes up by 0x80.
         self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
 
     async def send_cmd(self, cmd: str, channel: BleakGATTCharacteristic, delay: float = 1.0):
@@ -135,24 +128,14 @@ class MonocleAudioServer:
         await self.send_cmd("import display, microphone, bluetooth, time", repl_rx_char)
         await self.send_cmd("initial_text = display.Text('hello world', 0, 0, display.WHITE)", repl_rx_char)
         await self.send_cmd("display.show(initial_text);", repl_rx_char)
-        # There may be some issues with this recording/sending code, the
-        # received audio seems to have a lot of clipping. This could be
-        # due to bandwidth issues over bluetooth (see send_cmd comment)
-        # or maybe the data channel isn't being processed correctly, I
-        # didn't read the documentation too closely. We also hardcode
-        # a fixed recording time of 5 seconds due to the constraints of the
-        # hackathon, but this can be extended to using the touch buttons on the
-        # device or to continually record and stream the audio bytes to the
-        # server.
+        # We hardcode a fixed recording time of 5 seconds due to the
+        # constraints of the hackathon, but this can be extended to using the
+        # touch buttons on the device or to continually record and stream the
+        # audio bytes to the server.
         await self.send_cmd("print('start recording')\nmicrophone.record(seconds=5.0, sample_rate=8000, bit_depth=8)", repl_rx_char, 5)
         await self.send_cmd("print('stop recording')", repl_rx_char)
-        # This code to send the audio bytes over the data channel is extremely
-        # hacky. There are probably issues with the FPGA buffer being overflown
-        # depending on which record/wait times are used. One potential fix for
-        # this is to buffer the audio on the micropython side outside of the
-        # FPGA and then do some sort of stream sending with error checking
-        # but this is more complicated and also asyncio on the micropython side
-        # may be borked.
+
+        # Data may be lost without except OSError: pass
         await self.send_cmd("""
 while True:
   chunk = microphone.read(100)
@@ -175,7 +158,6 @@ while True:
         with open(AUDIO_OUTPUT_PATH, "wb") as f:
             f.write(self.audio_buffer)
         transcript = transcribe(AUDIO_OUTPUT_PATH)
-        print(f"TRANSCRIPTION: {transcript}")
         translation = translate(transcript)
         print(f"TRANSCRIPTION: {transcript}")
         print(f"TRANSLATION: {translation}")
