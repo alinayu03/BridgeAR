@@ -158,15 +158,32 @@ while True:
         with open(AUDIO_OUTPUT_PATH, "wb") as f:
             f.write(self.audio_buffer)
         transcript = transcribe(AUDIO_OUTPUT_PATH)
-        translation = translate(transcript)
+        # translation = translate(transcript)
         print(f"TRANSCRIPTION: {transcript}")
-        print(f"TRANSLATION: {translation}")
+        # print(f"TRANSLATION: {translation}")
+        return transcript
 
+    async def write_text(self, transcript: str):
+        repl = self.client.services.get_service(UART_SERVICE_UUID)
+        # data = self.client.services.get_service(DATA_SERVICE_UUID)
+        repl_rx_char = repl.get_characteristic(UART_RX_CHAR_UUID)
+        # data_rx_char = data.get_characteristic(DATA_RX_CHAR_UUID)
+
+        # This sleep is needed here to wait for resources to be available,
+        # but in theory there should be some way to be notified when the
+        # device is ready.
+        await asyncio.sleep(5)
+        await self.client.write_gatt_char(repl_rx_char, b"\x03\x01")
+        await self.send_cmd("print('world hello')", repl_rx_char)
+        await self.send_cmd("import display, microphone, bluetooth, time", repl_rx_char)
+        await self.send_cmd(f"transcript = display.Text('{transcript}', 0, 0, display.WHITE)", repl_rx_char)
+        await self.send_cmd("display.show(transcript);", repl_rx_char)
 
 async def main():
     async with MonocleAudioServer() as audio_server:
         await audio_server.send_payload()
-        audio_server.process_audio()
+        transcript = audio_server.process_audio()
+        await audio_server.write_text(transcript)
 
 
 if __name__ == "__main__":
