@@ -76,7 +76,7 @@ class MonocleAudioServer:
         # we manually prepend the WAV header and expect the output to be a WAV
         # file, we manually convert the signed bytes to unsigned by shifting
         # all bytes up by 0x80.
-        
+
         # Convert entire array at once
         signed_data = np.frombuffer(data, dtype=np.int8)
         unsigned_data = (signed_data + 0x80).astype(np.uint8)
@@ -110,29 +110,36 @@ class MonocleAudioServer:
         await asyncio.sleep(5)
         await self.client.write_gatt_char(repl_rx_char, b"\x03\x01")
         await self.send_cmd("print('hello world')", repl_rx_char)
-        await self.send_cmd("import display, microphone, bluetooth, time", repl_rx_char)
+        await self.send_cmd("import display, microphone, bluetooth, time, touch", repl_rx_char)
         await self.send_cmd("initial_text = display.Text('hello world', 0, 0, display.WHITE)", repl_rx_char)
         await self.send_cmd("display.show(initial_text);", repl_rx_char)
         # We hardcode a fixed recording time of 5 seconds due to the
         # constraints of the hackathon, but this can be extended to using the
         # touch buttons on the device or to continually record and stream the
         # audio bytes to the server.
-        await self.send_cmd("print('start recording')\nmicrophone.record(seconds=5.0, sample_rate=8000, bit_depth=8)", repl_rx_char, 5)
-        await self.send_cmd("print('stop recording')", repl_rx_char)
-
+        await self.send_cmd("""
+def fn(arg):
+    if arg == touch.A:
+        print("start recording")
+                            
+        microphone.record(seconds=5.0, sample_rate=8000, bit_depth=8)
+        print("stop recording")
+""", repl_rx_char, 5)
+        await self.send_cmd("touch.callback(touch.A, fn)", repl_rx_char)
         # Data may be lost without except OSError: pass
         await self.send_cmd("""
-while True:
-  chunk = microphone.read(100)
-  if chunk == None:
-    time.sleep(1)
-    break
-  while True:
-    try:
-      bluetooth.send(chunk)
-      break
-    except OSError:
-      pass
+if state(A):
+    while True:
+    chunk = microphone.read(100)
+    if chunk == None:
+        time.sleep(1)
+        break
+    while True:
+        try:
+        bluetooth.send(chunk)
+        break
+        except OSError:
+        pass
 """, repl_rx_char)
         await asyncio.sleep(1)
 
