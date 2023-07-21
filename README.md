@@ -3,7 +3,7 @@
 ## Overview 
 Open source AR/AI project designed to bridge communication with AR auto-captioning tool to caption real life and gesture to speech tool. 
 
-- Use Case: Assisting deaf, hard of hearing, or just people who prefer captions. 
+- Use Case: Assisting people who are deaf, hard of hearing, or just prefer captions. 
 - Built for: Brilliant Labs AR Monocle, Harvard 2023 AR/AI Hackathon
 - Built with: OpenAI Whisper, GPT-3, fine tuned Resnet model
 ## Features
