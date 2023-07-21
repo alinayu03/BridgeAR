@@ -7,10 +7,10 @@ from bleak.backends.scanner import AdvertisementData
 from bleak.uuids import register_uuids
 import sys
 import whisper
-import openai
 import numpy as np
+import speech
 
-
+# Bluetooth
 UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 UART_RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 UART_TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
@@ -19,12 +19,15 @@ DATA_SERVICE_UUID = "e5700001-7bac-429a-b4ce-57ff900f479d"
 DATA_RX_CHAR_UUID = "e5700002-7bac-429a-b4ce-57ff900f479d"
 DATA_TX_CHAR_UUID = "e5700003-7bac-429a-b4ce-57ff900f479d"
 
+# Audio
 # 8 bit wav header
 WAV_HEADER = (b"\x52\x49\x46\x46\x00\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20"
               b"\x10\x00\x00\x00\x01\x00\x01\x00\x40\x1f\x00\x00\x40\x1f\x00\x00"
               b"\x01\x00\x08\x00\x64\x61\x74\x61\x00\x00\x00\x00")
 AUDIO_OUTPUT_PATH = "/tmp/audio.wav"
 
+# Model
+base = whisper.load_model("base")
 
 async def get_device():
     def match_repl_uuid(_: BLEDevice, adv: AdvertisementData):
@@ -33,34 +36,11 @@ async def get_device():
 
     return await BleakScanner.find_device_by_filter(match_repl_uuid)
 
-
 def handle_disconnect(_: BleakClient):
     print("Device disconnected", file=sys.stderr)
     # cancelling all tasks effectively ends the program
     for task in asyncio.all_tasks():
         task.cancel()
-
-
-def transcribe(fp: str):
-    model = whisper.load_model("base")
-    # Ideally we would just take in a tensor of the raw audio bytes rather than
-    # pass in a path.
-    result = model.transcribe(fp)
-    transcript = result["text"]
-    return transcript
-
-
-def translate(transcript: str):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system",
-                "content": "You are a translator. Translate this into English."},
-            {"role": "user", "content": transcript}
-        ]
-    )
-    return response['choices'][0]['message']['content']
-
 
 class MonocleAudioServer:
     def __init__(self):
@@ -96,8 +76,7 @@ class MonocleAudioServer:
         # we manually prepend the WAV header and expect the output to be a WAV
         # file, we manually convert the signed bytes to unsigned by shifting
         # all bytes up by 0x80.
-        # self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
-
+        
         # Convert entire array at once
         signed_data = np.frombuffer(data, dtype=np.int8)
         unsigned_data = (signed_data + 0x80).astype(np.uint8)
@@ -163,10 +142,10 @@ while True:
         self.audio_buffer[40:44] = (len(self.audio_buffer) - 44).to_bytes(4)
         with open(AUDIO_OUTPUT_PATH, "wb") as f:
             f.write(self.audio_buffer)
-        transcript = transcribe(AUDIO_OUTPUT_PATH)
-        # translation = translate(transcript)
+        
+        # Transcribe audio
+        transcript = speech.transcribe(fp=AUDIO_OUTPUT_PATH, whisper_model=base)
         print(f"TRANSCRIPTION: {transcript}")
-        # print(f"TRANSLATION: {translation}")
         return transcript
 
     async def write_text(self, transcript: str):
