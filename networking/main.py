@@ -8,6 +8,7 @@ from bleak.uuids import register_uuids
 import sys
 import whisper
 import openai
+import numpy as np
 
 
 UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
@@ -95,7 +96,12 @@ class MonocleAudioServer:
         # we manually prepend the WAV header and expect the output to be a WAV
         # file, we manually convert the signed bytes to unsigned by shifting
         # all bytes up by 0x80.
-        self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
+        # self.audio_buffer.extend(bytearray([(c + 0x80) & 0xff for c in data]))
+
+        # Convert entire array at once
+        signed_data = np.frombuffer(data, dtype=np.int8)
+        unsigned_data = (signed_data + 0x80).astype(np.uint8)
+        self.audio_buffer.extend(unsigned_data.tobytes())
 
     async def send_cmd(self, cmd: str, channel: BleakGATTCharacteristic, delay: float = 1.0):
         # Write cmd ending with \x04 (ctrl-d) as bytestring. ctrl-d is used
@@ -168,13 +174,8 @@ while True:
         # data = self.client.services.get_service(DATA_SERVICE_UUID)
         repl_rx_char = repl.get_characteristic(UART_RX_CHAR_UUID)
         # data_rx_char = data.get_characteristic(DATA_RX_CHAR_UUID)
-
-        # This sleep is needed here to wait for resources to be available,
-        # but in theory there should be some way to be notified when the
-        # device is ready.
-        await asyncio.sleep(5)
         await self.client.write_gatt_char(repl_rx_char, b"\x03\x01")
-        await self.send_cmd("print('world hello')", repl_rx_char)
+        await self.send_cmd("print('transcription')", repl_rx_char)
         await self.send_cmd("import display, microphone, bluetooth, time", repl_rx_char)
         await self.send_cmd(f"transcript = display.Text('{transcript}', 0, 0, display.WHITE)", repl_rx_char)
         await self.send_cmd("display.show(transcript);", repl_rx_char)
@@ -184,7 +185,6 @@ async def main():
         await audio_server.send_payload()
         transcript = audio_server.process_audio()
         await audio_server.write_text(transcript)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
